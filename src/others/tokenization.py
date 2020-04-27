@@ -193,6 +193,7 @@ class BasicTokenizer(object):
         for i,token in enumerate(orig_tokens):
             if self.do_lower_case and token not in self.never_split:
                 token = token.lower()
+                token = self._run_strip_accents(token)
             # split_tokens.append(token)
             split_tokens.extend([(i,t) for t in self._run_split_on_punc(token)])
 
@@ -201,7 +202,7 @@ class BasicTokenizer(object):
 
     def _run_strip_accents(self, text):
         """Strips accents from a piece of text."""
-        text = unicodedata.normalize("NFD", text)
+        text = unicodedata.normalize("NFC", text)
         output = []
         for char in text:
             cat = unicodedata.category(char)
