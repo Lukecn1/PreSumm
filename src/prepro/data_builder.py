@@ -117,8 +117,6 @@ def tokenize(args):
     print("Making list of files to tokenize...")
     with open("mapping_for_corenlp.txt", "w") as f:
         for s in stories:
-            if (not s.endswith('txt')):
-                continue
             f.write("%s\n" % (os.path.join(stories_dir, s)))
     command = ['java', 'edu.stanford.nlp.pipeline.StanfordCoreNLP', '-annotators', 'tokenize,ssplit',
                '-ssplit.newlineIsSentenceBreak', 'always', '-filelist', 'mapping_for_corenlp.txt', '-outputFormat',
@@ -207,8 +205,7 @@ def hashhex(s):
 class BertData():
     def __init__(self, args):
         self.args = args
-        self.tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-uncased', do_lower_case=True)
-
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False)
         self.sep_token = '[SEP]'
         self.cls_token = '[CLS]'
         self.pad_token = '[PAD]'
@@ -219,7 +216,7 @@ class BertData():
         self.cls_vid = self.tokenizer.vocab[self.cls_token]
         self.pad_vid = self.tokenizer.vocab[self.pad_token]
 
-    def preprocess(self, src, tgt, sent_labels, use_bert_basic_tokenizer=False, is_test=False):
+    def preprocess(self, src, tgt, sent_labels, use_bert_basic_tokenizer, is_test=False):
 
         if ((not is_test) and len(src) == 0):
             return None
@@ -243,7 +240,7 @@ class BertData():
         src_txt = [' '.join(sent) for sent in src]
         text = ' {} {} '.format(self.sep_token, self.cls_token).join(src_txt)
 
-        src_subtokens = self.tokenizer.tokenize(text)
+        src_subtokens = self.tokenizer.tokenize(text, use_bert_basic_tokenizer)
 
         src_subtokens = [self.cls_token] + src_subtokens + [self.sep_token]
         src_subtoken_idxs = self.tokenizer.convert_tokens_to_ids(src_subtokens)
@@ -259,7 +256,7 @@ class BertData():
         sent_labels = sent_labels[:len(cls_ids)]
 
         tgt_subtokens_str = '[unused1] ' + ' [unused3] '.join(
-            [' '.join(self.tokenizer.tokenize(' '.join(tt), use_bert_basic_tokenizer=use_bert_basic_tokenizer)) for tt in tgt]) + ' [unused1]'
+            [' '.join(self.tokenizer.tokenize(' '.join(tt), use_bert_basic_tokenizer)) for tt in tgt]) + ' [unused1]'
         tgt_subtoken = tgt_subtokens_str.split()[:self.args.max_tgt_ntokens]
         if ((not is_test) and len(tgt_subtoken) < self.args.min_tgt_ntokens):
             return None
@@ -333,14 +330,16 @@ def format_to_lines(args):
     for corpus_type in ['valid', 'test', 'train']:
         temp = []
         for line in open(pjoin(args.map_path, 'mapping_' + corpus_type + '.txt')):
-            temp.append(hashhex(line.strip()))
+            temp.append(line)
         corpus_mapping[corpus_type] = {key.strip(): 1 for key in temp}
     train_files, valid_files, test_files = [], [], []
     for f in glob.glob(pjoin(args.raw_path, '*.json')):
-        real_name = f.split('/')[-1].split('.')[0]
-        print(real_name)
+        rl = f.split('/')
+        length = len(rl)
+        real_name = rl[length-1].split('.')[0]
         if (real_name in corpus_mapping['valid']):
             valid_files.append(f)
+
         elif (real_name in corpus_mapping['test']):
             test_files.append(f)
         elif (real_name in corpus_mapping['train']):
@@ -360,7 +359,7 @@ def format_to_lines(args):
                 pt_file = "{:s}.{:s}.{:d}.json".format(args.save_path, corpus_type, p_ct)
                 with open(pt_file, 'w') as save:
                     # save.write('\n'.join(dataset))
-                    save.write(json.dumps(dataset))
+                    save.write(json.dumps(dataset, ensure_ascii=False))
                     p_ct += 1
                     dataset = []
 
@@ -370,7 +369,7 @@ def format_to_lines(args):
             pt_file = "{:s}.{:s}.{:d}.json".format(args.save_path, corpus_type, p_ct)
             with open(pt_file, 'w') as save:
                 # save.write('\n'.join(dataset))
-                save.write(json.dumps(dataset))
+                save.write(json.dumps(dataset, ensure_ascii=False))
                 p_ct += 1
                 dataset = []
 
@@ -410,7 +409,7 @@ def format_xsum_to_lines(args):
             if (len(dataset) > args.shard_size):
                 pt_file = "{:s}.{:s}.{:d}.json".format(args.save_path, corpus_type, p_ct)
                 with open(pt_file, 'w') as save:
-                    save.write(json.dumps(dataset))
+                    save.write(json.dumps(dataset, ensure_ascii=False))
                     p_ct += 1
                     dataset = []
 
@@ -419,7 +418,7 @@ def format_xsum_to_lines(args):
         if (len(dataset) > 0):
             pt_file = "{:s}.{:s}.{:d}.json".format(args.save_path, corpus_type, p_ct)
             with open(pt_file, 'w') as save:
-                save.write(json.dumps(dataset))
+                save.write(json.dumps(dataset, ensure_ascii=False))
                 p_ct += 1
                 dataset = []
 
