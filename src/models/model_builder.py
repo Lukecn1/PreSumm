@@ -49,6 +49,7 @@ def build_optim_bert(args, model, checkpoint):
         if args.visible_gpus != '-1':
             for state in optim.optimizer.state.values():
                 for k, v in state.items():
+                    optim.zero_grad()
                     if torch.is_tensor(v):
                         state[k] = v.cuda()
 
