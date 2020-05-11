@@ -187,7 +187,7 @@ def validate(args, device_id, pt, step):
                                         shuffle=False, is_test=False)
     usedModel = args.bert_model.split("-")
     lower = False
-    if (usedModel[len(usedModel) - 1] == 'uncased'):
+    if (usedModel[len(usedModel) - 1] != 'cased'):
         lower = True
 
     tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=lower, cache_dir=args.temp_dir)
@@ -225,7 +225,7 @@ def test_abs(args, device_id, pt, step):
 
     usedModel = args.bert_model.split("-")
     lower = False
-    if (usedModel[len(usedModel) - 1] == 'uncased'):
+    if (usedModel[len(usedModel) - 1] != 'cased'):
         lower = True
 
     tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=lower, cache_dir=args.temp_dir)
