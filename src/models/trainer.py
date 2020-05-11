@@ -29,7 +29,7 @@ def build_trainer(args, device_id, model, optims,loss):
             used to save the model
     """
     device = "cpu" if args.visible_gpus == '-1' else "cuda"
-
+    device_id = 0 if device == "cuda" else -1
 
     grad_accum_count = args.accum_count
     n_gpu = args.world_size

@@ -187,7 +187,7 @@ def validate(args, device_id, pt, step):
                                         shuffle=False, is_test=False)
     usedModel = args.bert_model.split("-")
     lower = False
-    if(usedModel[len(usedModel)-1] == 'uncased'):
+    if (usedModel[len(usedModel) - 1] == 'uncased'):
         lower = True
 
     tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=lower, cache_dir=args.temp_dir)
@@ -225,7 +225,7 @@ def test_abs(args, device_id, pt, step):
 
     usedModel = args.bert_model.split("-")
     lower = False
-    if(usedModel[len(usedModel)-1] == 'uncased'):
+    if (usedModel[len(usedModel) - 1] == 'uncased'):
         lower = True
 
     tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=lower, cache_dir=args.temp_dir)
@@ -258,7 +258,7 @@ def test_text_abs(args, device_id, pt, step):
                                        shuffle=False, is_test=True)
     usedModel = args.bert_model.split("-")
     lower = False
-    if(usedModel[len(usedModel)-1] == 'uncased'):
+    if (usedModel[len(usedModel) - 1] == 'uncased'):
         lower = True
 
     tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=lower, cache_dir=args.temp_dir)
@@ -327,7 +327,16 @@ def train_abs_single(args, device_id):
         return data_loader.Dataloader(args, load_dataset(args, 'train', shuffle=True), args.batch_size, device,
                                       shuffle=True, is_test=False)
 
-    model = AbsSummarizer(args, device, checkpoint, bert_from_extractive)
+    lower = False
+    if (args.bert_model != 'bert-base-multilingual-cased'):
+        lower = True
+
+    tokenizer = BertTokenizer.from_pretrained(args.vocab_model, do_lower_case=lower, cache_dir=args.temp_dir)
+    model = AbsSummarizer(args, device,len(tokenizer), checkpoint, bert_from_extractive)
+
+
+    symbols = {'BOS': tokenizer.vocab['[unused1]'], 'EOS': tokenizer.vocab['[unused2]'], 'PAD': tokenizer.vocab['[PAD]'], 'EOQ': tokenizer.vocab['[unused3]']}
+
     if (args.sep_optim):
         optim_bert = model_builder.build_optim_bert(args, model, checkpoint)
         optim_dec = model_builder.build_optim_dec(args, model, checkpoint)
@@ -336,18 +345,10 @@ def train_abs_single(args, device_id):
         optim = [model_builder.build_optim(args, model, checkpoint)]
 
     logger.info(model)
-    usedModel = args.bert_model.split("-")
-    lower = False
-    if(usedModel[len(usedModel)-1] == 'uncased'):
-        lower = True
-
-    tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=lower, cache_dir=args.temp_dir)
-    symbols = {'BOS': tokenizer.vocab['[unused1]'], 'EOS': tokenizer.vocab['[unused2]'],
-               'PAD': tokenizer.vocab['[PAD]'], 'EOQ': tokenizer.vocab['[unused3]']}
-
     train_loss = abs_loss(model.generator, symbols, model.vocab_size, device, train=True,
                           label_smoothing=args.label_smoothing)
 
     trainer = build_trainer(args, device_id, model, optim, train_loss)
-
+    print(model.vocab_size)
+    print(trainer)
     trainer.train(train_iter_fct, args.train_steps)

@@ -60,6 +60,7 @@ if __name__ == '__main__':
 
     parser.add_argument("-lower", type=str2bool, nargs='?',const=True,default=False)
     parser.add_argument("-use_bert_basic_tokenizer", nargs='?', type=str2bool, default=False)
+    parser.add_argument("-botxo", default="")
 
     parser.add_argument('-log_file', default='../logs/cnndm.log')
 
