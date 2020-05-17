@@ -206,7 +206,7 @@ class BertData():
     def __init__(self, args):
         self.args = args
         if(args.botxo != ""):
-            self.tokenizer = BertTokenizer.from_pretrained(args.botxo, do_lower_case=False)
+            self.tokenizer = BertTokenizer.from_pretrained(args.botxo, do_lower_case=True)
         else:
             self.tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False)
         self.sep_token = '[SEP]'

@@ -179,7 +179,7 @@ class ExtSummarizer(nn.Module):
 
 
 class AbsSummarizer(nn.Module):
-    def __init__(self, args, device, vocab_size, checkpoint=None, bert_from_extractive=None):
+    def __init__(self, args, device, checkpoint=None, bert_from_extractive=None):
         super(AbsSummarizer, self).__init__()
         self.args = args
         self.device = device
