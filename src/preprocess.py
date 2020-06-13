@@ -49,6 +49,7 @@ if __name__ == '__main__':
     parser.add_argument("-map_path", default='../../data/')
     parser.add_argument("-raw_path", default='../../line_data')
     parser.add_argument("-save_path", default='../../data/')
+    parser.add_argument("-bert_model", default='bert-base-multilingual-cased')
 
     parser.add_argument("-shard_size", default=2000, type=int)
     parser.add_argument('-min_src_nsents', default=3, type=int)
@@ -59,8 +60,7 @@ if __name__ == '__main__':
     parser.add_argument('-max_tgt_ntokens', default=500, type=int)
 
     parser.add_argument("-lower", type=str2bool, nargs='?',const=True,default=False)
-    parser.add_argument("-use_bert_basic_tokenizer", nargs='?', type=str2bool, default=False)
-    parser.add_argument("-botxo", default="")
+    parser.add_argument("-use_bert_basic_tokenizer", type=str2bool, nargs='?',const=True,default=False)
 
     parser.add_argument('-log_file', default='../logs/cnndm.log')
 
@@ -71,7 +71,4 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     init_logger(args.log_file)
-    print(args)
     eval('data_builder.'+args.mode + '(args)')
-
-

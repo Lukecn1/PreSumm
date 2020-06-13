@@ -205,10 +205,17 @@ def hashhex(s):
 class BertData():
     def __init__(self, args):
         self.args = args
-        if(args.botxo != ""):
-            self.tokenizer = BertTokenizer.from_pretrained(args.botxo, do_lower_case=True)
-        else:
+        if(args.bert_model == 'bert-base-multilingual-cased'):
             self.tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False)
+        else:
+            self.tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True)
+            print(len(self.tokenizer.vocab))
+            if(len(self.tokenizer.vocab) == 31748):
+                f = open(args.bert_model+"/vocab.txt", "a")
+                f.write("\n[unused1]\n[unused2]\n[unused3]\n[unused4]\n[unused5]\n[unused6]\n[unused7]")
+                f.close()
+                self.tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True)
+            print(len(self.tokenizer.vocab))
         self.sep_token = '[SEP]'
         self.cls_token = '[CLS]'
         self.pad_token = '[PAD]'
@@ -259,7 +266,7 @@ class BertData():
         sent_labels = sent_labels[:len(cls_ids)]
 
         tgt_subtokens_str = '[unused1] ' + ' [unused3] '.join(
-            [' '.join(self.tokenizer.tokenize(' '.join(tt), use_bert_basic_tokenizer)) for tt in tgt]) + ' [unused1]'
+            [' '.join(self.tokenizer.tokenize(' '.join(tt), use_bert_basic_tokenizer)) for tt in tgt]) + ' [unused2]'
         tgt_subtoken = tgt_subtokens_str.split()[:self.args.max_tgt_ntokens]
         if ((not is_test) and len(tgt_subtoken) < self.args.min_tgt_ntokens):
             return None
@@ -342,14 +349,12 @@ def format_to_lines(args):
         real_name = rl[length-1].split('.')[0]
         if (real_name in corpus_mapping['valid']):
             valid_files.append(f)
-
         elif (real_name in corpus_mapping['test']):
             test_files.append(f)
         elif (real_name in corpus_mapping['train']):
             train_files.append(f)
         else:
             train_files.append(f)
-
     corpora = {'train': train_files, 'valid': valid_files, 'test': test_files}
     for corpus_type in ['train', 'valid', 'test']:
         a_lst = [(f, args) for f in corpora[corpus_type]]
@@ -365,7 +370,6 @@ def format_to_lines(args):
                     save.write(json.dumps(dataset, ensure_ascii=False))
                     p_ct += 1
                     dataset = []
-
         pool.close()
         pool.join()
         if (len(dataset) > 0):
@@ -412,7 +416,7 @@ def format_xsum_to_lines(args):
             if (len(dataset) > args.shard_size):
                 pt_file = "{:s}.{:s}.{:d}.json".format(args.save_path, corpus_type, p_ct)
                 with open(pt_file, 'w') as save:
-                    save.write(json.dumps(dataset, ensure_ascii=False))
+                    save.write(json.dumps(dataset))
                     p_ct += 1
                     dataset = []
 
@@ -421,7 +425,7 @@ def format_xsum_to_lines(args):
         if (len(dataset) > 0):
             pt_file = "{:s}.{:s}.{:d}.json".format(args.save_path, corpus_type, p_ct)
             with open(pt_file, 'w') as save:
-                save.write(json.dumps(dataset, ensure_ascii=False))
+                save.write(json.dumps(dataset))
                 p_ct += 1
                 dataset = []
 

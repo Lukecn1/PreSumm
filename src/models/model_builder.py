@@ -2,7 +2,7 @@ import copy
 
 import torch
 import torch.nn as nn
-from pytorch_transformers import BertModel, BertConfig, PretrainedConfig
+from pytorch_transformers import BertModel, BertConfig
 from torch.nn.init import xavier_uniform_
 
 from models.decoder import TransformerDecoder
@@ -113,16 +113,15 @@ def get_generator(vocab_size, dec_hidden_size, device):
     return generator
 
 class Bert(nn.Module):
-    def __init__(self, large, bert_model, temp_dir, finetune=False ):
+    def __init__(self, bert_model, temp_dir, finetune=False):
         super(Bert, self).__init__()
-        if(bert_model != 'bert-base-multilingual-cased'):
-            self.model = BertModel.from_pretrained(bert_model, cache_dir=temp_dir)
-            self.model.resize_token_embeddings(31756)
+
+        if(bert_model == 'bert-base-multilingual-cased'):
+            self.model = BertModel.from_pretrained('bert-base-multilingual-cased', cache_dir=temp_dir)
         else:
-            if(large):
-                self.model = BertModel.from_pretrained(bert_model, cache_dir=temp_dir)
-            else:
-                self.model = BertModel.from_pretrained('bert-base-multilingual-cased')
+            self.model = BertModel.from_pretrained(bert_model, cache_dir=temp_dir)
+            self.model.resize_token_embeddings(31755)
+            self.model.embeddings(119547, 768, 0)
 
         self.finetune = finetune
 
@@ -141,7 +140,7 @@ class ExtSummarizer(nn.Module):
         super(ExtSummarizer, self).__init__()
         self.args = args
         self.device = device
-        self.bert = Bert(args.large, args.bert_model, args.temp_dir, args.finetune_bert)
+        self.bert = Bert(args.bert_model, args.temp_dir, args.finetune_bert)
 
         self.ext_layer = ExtTransformerEncoder(self.bert.model.config.hidden_size, args.ext_ff_size, args.ext_heads,
                                                args.ext_dropout, args.ext_layers)
@@ -156,6 +155,7 @@ class ExtSummarizer(nn.Module):
             my_pos_embeddings.weight.data[:512] = self.bert.model.embeddings.position_embeddings.weight.data
             my_pos_embeddings.weight.data[512:] = self.bert.model.embeddings.position_embeddings.weight.data[-1][None,:].repeat(args.max_pos-512,1)
             self.bert.model.embeddings.position_embeddings = my_pos_embeddings
+
 
         if checkpoint is not None:
             self.load_state_dict(checkpoint['model'], strict=True)
@@ -183,7 +183,8 @@ class AbsSummarizer(nn.Module):
         super(AbsSummarizer, self).__init__()
         self.args = args
         self.device = device
-        self.bert = Bert(args.large, args.bert_model, args.temp_dir, args.finetune_bert)
+        self.bert = Bert(args.bert_model, args.temp_dir, args.finetune_bert)
+
         if bert_from_extractive is not None:
             self.bert.model.load_state_dict(
                 dict([(n[11:], p) for n, p in bert_from_extractive.items() if n.startswith('bert.model')]), strict=True)

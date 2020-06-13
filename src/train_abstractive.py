@@ -15,6 +15,7 @@ import torch
 from pytorch_transformers import BertTokenizer
 
 import distributed
+from pathlib import Path
 from models import data_loader, model_builder
 from models.data_loader import load_dataset
 from models.loss import abs_loss
@@ -179,20 +180,28 @@ def validate(args, device_id, pt, step):
             setattr(args, k, opt[k])
     print(args)
 
-    model = AbsSummarizer(args, device, checkpoint)
-    model.eval()
-
     valid_iter = data_loader.Dataloader(args, load_dataset(args, 'valid', shuffle=False),
                                         args.batch_size, device,
                                         shuffle=False, is_test=False)
-    usedModel = args.bert_model.split("-")
-    lower = False
-    if (usedModel[len(usedModel) - 1] != 'cased'):
-        lower = True
 
-    tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=lower, cache_dir=args.temp_dir)
+    if(args.bert_model == 'bert-base-multilingual-cased'):
+        tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False, cache_dir=args.temp_dir)
+    else:
+        tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True, cache_dir=args.temp_dir)
+        print(len(tokenizer.vocab))
+        if (len(tokenizer.vocab) == 31748):
+            f = open(args.bert_model + "/vocab.txt", "a")
+            f.write("\n[unused1]\n[unused2]\n[unused3]\n[unused4]\n[unused5]\n[unused6]\n[unused7]")
+            f.close()
+            tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True)
+        print(len(tokenizer.vocab))
+
     symbols = {'BOS': tokenizer.vocab['[unused1]'], 'EOS': tokenizer.vocab['[unused2]'],
                'PAD': tokenizer.vocab['[PAD]'], 'EOQ': tokenizer.vocab['[unused3]']}
+
+
+    model = AbsSummarizer(args, device, checkpoint)
+    model.eval()
 
     valid_loss = abs_loss(model.generator, symbols, model.vocab_size, train=False, device=device)
 
@@ -216,21 +225,29 @@ def test_abs(args, device_id, pt, step):
             setattr(args, k, opt[k])
     print(args)
 
-    model = AbsSummarizer(args, device, checkpoint)
-    model.eval()
 
     test_iter = data_loader.Dataloader(args, load_dataset(args, 'test', shuffle=False),
                                        args.test_batch_size, device,
                                        shuffle=False, is_test=True)
+    if (args.bert_model == 'bert-base-multilingual-cased'):
+        tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False,
+                                                  cache_dir=args.temp_dir)
+    else:
+        tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True, cache_dir=args.temp_dir)
+        print(len(tokenizer.vocab))
+        if (len(tokenizer.vocab) == 31748):
+            f = open(args.bert_model + "/vocab.txt", "a")
+            f.write("\n[unused1]\n[unused2]\n[unused3]\n[unused4]\n[unused5]\n[unused6]\n[unused7]")
+            f.close()
+            tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True)
+        print(len(tokenizer.vocab))
 
-    usedModel = args.bert_model.split("-")
-    lower = False
-    if (usedModel[len(usedModel) - 1] != 'cased'):
-        lower = True
-
-    tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=lower, cache_dir=args.temp_dir)
     symbols = {'BOS': tokenizer.vocab['[unused1]'], 'EOS': tokenizer.vocab['[unused2]'],
                'PAD': tokenizer.vocab['[PAD]'], 'EOQ': tokenizer.vocab['[unused3]']}
+
+    model = AbsSummarizer(args, device, checkpoint)
+    model.eval()
+
     predictor = build_predictor(args, tokenizer, symbols, model, logger)
     predictor.translate(test_iter, step)
 
@@ -250,20 +267,29 @@ def test_text_abs(args, device_id, pt, step):
             setattr(args, k, opt[k])
     print(args)
 
-    model = AbsSummarizer(args, device, checkpoint)
-    model.eval()
 
     test_iter = data_loader.Dataloader(args, load_dataset(args, 'test', shuffle=False),
                                        args.test_batch_size, device,
                                        shuffle=False, is_test=True)
-    usedModel = args.bert_model.split("-")
-    lower = False
-    if (usedModel[len(usedModel) - 1] != 'cased'):
-        lower = True
+    if (args.bert_model == 'bert-base-multilingual-cased'):
+        tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False,
+                                                  cache_dir=args.temp_dir)
+    else:
+        tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True, cache_dir=args.temp_dir)
+        print(len(tokenizer.vocab))
+        if (len(tokenizer.vocab) == 31748):
+            f = open(args.bert_model + "/vocab.txt", "a")
+            f.write("\n[unused1]\n[unused2]\n[unused3]\n[unused4]\n[unused5]\n[unused6]\n[unused7]")
+            f.close()
+            tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True)
+        print(len(tokenizer.vocab))
 
-    tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=lower, cache_dir=args.temp_dir)
     symbols = {'BOS': tokenizer.vocab['[unused1]'], 'EOS': tokenizer.vocab['[unused2]'],
                'PAD': tokenizer.vocab['[PAD]'], 'EOQ': tokenizer.vocab['[unused3]']}
+
+    model = AbsSummarizer(args, device, checkpoint)
+    model.eval()
+
     predictor = build_predictor(args, tokenizer, symbols, model, logger)
     predictor.translate(test_iter, step)
 
@@ -327,15 +353,23 @@ def train_abs_single(args, device_id):
         return data_loader.Dataloader(args, load_dataset(args, 'train', shuffle=True), args.batch_size, device,
                                       shuffle=True, is_test=False)
 
-    lower = False
-    if (args.bert_model != 'bert-base-multilingual-cased'):
-        lower = True
+    if (args.bert_model == 'bert-base-multilingual-cased'):
+        tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False,
+                                                  cache_dir=args.temp_dir)
+    else:
+        tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True, cache_dir=args.temp_dir)
+        print(len(tokenizer.vocab))
+        if (len(tokenizer.vocab) == 31748):
+            f = open(args.bert_model + "/vocab.txt", "a")
+            f.write("\n[unused1]\n[unused2]\n[unused3]\n[unused4]\n[unused5]\n[unused6]\n[unused7]")
+            f.close()
+            tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True)
+        print(len(tokenizer.vocab))
 
-    tokenizer = BertTokenizer.from_pretrained(args.vocab_model, do_lower_case=lower, cache_dir=args.temp_dir)
+    symbols = {'BOS': tokenizer.vocab['[unused1]'], 'EOS': tokenizer.vocab['[unused2]'],
+               'PAD': tokenizer.vocab['[PAD]'], 'EOQ': tokenizer.vocab['[unused3]']}
+
     model = AbsSummarizer(args, device, checkpoint, bert_from_extractive)
-
-
-    symbols = {'BOS': tokenizer.vocab['[unused1]'], 'EOS': tokenizer.vocab['[unused2]'], 'PAD': tokenizer.vocab['[PAD]'], 'EOQ': tokenizer.vocab['[unused3]']}
 
     if (args.sep_optim):
         optim_bert = model_builder.build_optim_bert(args, model, checkpoint)
@@ -345,10 +379,10 @@ def train_abs_single(args, device_id):
         optim = [model_builder.build_optim(args, model, checkpoint)]
 
     logger.info(model)
+
     train_loss = abs_loss(model.generator, symbols, model.vocab_size, device, train=True,
                           label_smoothing=args.label_smoothing)
 
     trainer = build_trainer(args, device_id, model, optim, train_loss)
-    print(model.vocab_size)
-    print(trainer)
+
     trainer.train(train_iter_fct, args.train_steps)

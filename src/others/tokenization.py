@@ -23,7 +23,6 @@ import unicodedata
 from io import open
 
 from pytorch_transformers import cached_path
-from pytorch_transformers.tokenization_utils import PreTrainedTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +92,7 @@ class BertTokenizer(object):
         self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab)
         self.max_len = max_len if max_len is not None else int(1e12)
 
-    def tokenize(self, text, use_bert_basic_tokenizer):
+    def tokenize(self, text, use_bert_basic_tokenizer=False):
         split_tokens = []
         if(use_bert_basic_tokenizer):
             pretokens = self.basic_tokenizer.tokenize(text)
@@ -196,7 +195,7 @@ class BasicTokenizer(object):
         for i,token in enumerate(orig_tokens):
             if self.do_lower_case and token not in self.never_split:
                 token = token.lower()
-            token = self._run_strip_accents(token)
+                token = self._run_strip_accents(token)
             # split_tokens.append(token)
             split_tokens.extend([(i,t) for t in self._run_split_on_punc(token)])
 
