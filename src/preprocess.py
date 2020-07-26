@@ -50,6 +50,9 @@ if __name__ == '__main__':
     parser.add_argument("-raw_path", default='../../line_data')
     parser.add_argument("-save_path", default='../../data/')
     parser.add_argument("-bert_model", default='bert-base-multilingual-cased')
+    parser.add_argument("-type", default="full")
+    parser.add_argument("-zip_path", default="")
+    parser.add_argument("-botxo", default=False)
 
     parser.add_argument("-shard_size", default=2000, type=int)
     parser.add_argument('-min_src_nsents', default=3, type=int)

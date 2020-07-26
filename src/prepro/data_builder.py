@@ -9,7 +9,10 @@ import re
 import subprocess
 from collections import Counter
 from os.path import join as pjoin
-
+import pandas as pd
+import numpy as np
+from pathlib import Path
+from os import listdir
 import torch
 from multiprocess import Pool
 
@@ -23,12 +26,12 @@ from prepro.utils import _get_word_ngrams
 import xml.etree.ElementTree as ET
 
 nyt_remove_words = ["photo", "graph", "chart", "map", "table", "drawing"]
+count = 0
 
 
 def recover_from_corenlp(s):
     s = re.sub(r' \'{\w}', '\'\g<1>', s)
     s = re.sub(r'\'\' {\w}', '\'\'\g<1>', s)
-
 
 
 def load_json(p, lower):
@@ -51,7 +54,6 @@ def load_json(p, lower):
     source = [clean(' '.join(sent)).split() for sent in source]
     tgt = [clean(' '.join(sent)).split() for sent in tgt]
     return source, tgt
-
 
 
 def load_xml(p):
@@ -135,6 +137,7 @@ def tokenize(args):
                 tokenized_stories_dir, num_tokenized, stories_dir, num_orig))
     print("Successfully finished tokenizing %s to %s.\n" % (stories_dir, tokenized_stories_dir))
 
+
 def cal_rouge(evaluated_ngrams, reference_ngrams):
     reference_count = len(reference_ngrams)
     evaluated_count = len(evaluated_ngrams)
@@ -205,13 +208,13 @@ def hashhex(s):
 class BertData():
     def __init__(self, args):
         self.args = args
-        if(args.bert_model == 'bert-base-multilingual-cased'):
+        if (args.bert_model == 'bert-base-multilingual-cased'):
             self.tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False)
         else:
             self.tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True)
             print(len(self.tokenizer.vocab))
-            if(len(self.tokenizer.vocab) == 31748):
-                f = open(args.bert_model+"/vocab.txt", "a")
+            if (len(self.tokenizer.vocab) == 31748):
+                f = open(args.bert_model + "/vocab.txt", "a")
                 f.write("\n[unused1]\n[unused2]\n[unused3]\n[unused4]\n[unused5]\n[unused6]\n[unused7]")
                 f.close()
                 self.tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True)
@@ -346,7 +349,7 @@ def format_to_lines(args):
     for f in glob.glob(pjoin(args.raw_path, '*.json')):
         rl = f.split('/')
         length = len(rl)
-        real_name = rl[length-1].split('.')[0]
+        real_name = rl[length - 1].split('.')[0]
         if (real_name in corpus_mapping['valid']):
             valid_files.append(f)
         elif (real_name in corpus_mapping['test']):
@@ -388,8 +391,6 @@ def _format_to_lines(params):
     return {'src': source, 'tgt': tgt}
 
 
-
-
 def format_xsum_to_lines(args):
     if (args.dataset != ''):
         datasets = [args.dataset]
@@ -416,7 +417,7 @@ def format_xsum_to_lines(args):
             if (len(dataset) > args.shard_size):
                 pt_file = "{:s}.{:s}.{:d}.json".format(args.save_path, corpus_type, p_ct)
                 with open(pt_file, 'w') as save:
-                    save.write(json.dumps(dataset))
+                    save.write(json.dumps(dataset, ensure_ascii=False))
                     p_ct += 1
                     dataset = []
 
@@ -425,7 +426,7 @@ def format_xsum_to_lines(args):
         if (len(dataset) > 0):
             pt_file = "{:s}.{:s}.{:d}.json".format(args.save_path, corpus_type, p_ct)
             with open(pt_file, 'w') as save:
-                save.write(json.dumps(dataset))
+                save.write(json.dumps(dataset, ensure_ascii=False))
                 p_ct += 1
                 dataset = []
 
@@ -444,3 +445,207 @@ def _format_xsum_to_lines(params):
             tgt.append(sent.split())
         return {'src': source, 'tgt': tgt}
     return None
+
+
+# Generates and returns the dataframe with the relevant text features
+# Loads all the articles in the directory into the dataframe
+def format_tv2(args):
+    logger.info('Processing tv2')
+    # Creates a dataframe with all of the articles in the target directory
+    filepaths = [f for f in listdir(args.raw_path) if f.endswith('.json')]
+    df_cleaned = pd.concat(map(load_data_tv2, args, filepaths), ignore_index=True)
+    print(df_cleaned)
+    print('DATA LOADED')
+
+    df = df_cleaned[['body', 'summary']]
+    df.columns = ['text', 'summary']
+    if (args.type == 'combined'):
+        return df_cleaned
+
+
+    train, validate, test = train_validate_test_split(df, 0.90, 0.05, 242)
+    toTxtFile(train, "train","tv2", args)
+    toTxtFile(validate, "valid","tv2", args)
+    toTxtFile(test, "test", "tv2",args)
+
+
+# Cleans the given string from remaining html fragments and unwanted characters
+def text_cleaner(args, text):
+    # Regex to remove remaining HTML fragments from the string
+    # and further cleaning of the strings
+    s_html = re.sub(r'<.+?>', '', text)
+    s = s_html.replace('\n', ' ')
+    s = re.sub(' +', ' ', s)
+    s = s.replace('\xa0', ' ')
+    s = s.replace('´', '\'')
+    s = s.replace('`', '\'')
+    if (args.botxo == False):
+        s = s.replace('å', 'aa')
+        s = s.replace('Å', 'aa')
+    return s
+
+
+# Loads the data from the json files into a dataframe and cleans the HTML fragments from the text body
+def load_data_tv2(args, path):
+    source = args.raw_path + path
+
+    # Retrieve the designated json formatted file from the directory and place in a dataframe
+    df = pd.read_json(source, lines=True, orient='columns')
+    df = df[['summary', 'body']]
+
+    # List of the different html segments of the article body
+    dicts = df['body'].values[0]
+
+    # List of the different paragraphs
+    htmls = [item.get('html', "") for item in dicts]
+
+    # Concatenates all the strings
+    text = ''.join(htmls)
+
+    # Removes unwanted html fragments from the text
+    df['body'] = text_cleaner(args, text)
+    df['summary'] = text_cleaner(args, df['summary'].values[0])
+    return df
+
+
+def train_validate_test_split(df, train_percent=.90, validate_percent=.05, seed=None):
+    np.random.seed(seed)
+    perm = np.random.permutation(df.index)
+    m = len(df.index)
+    train_end = int(train_percent * m)
+    validate_end = int(validate_percent * m) + train_end
+    train = df.iloc[perm[:train_end]]
+    validate = df.iloc[perm[train_end:validate_end]]
+    test = df.iloc[perm[validate_end:]]
+    return train, validate, test
+
+
+def toTxtFile(df, mode, datasetName, args):
+    print("TO TXT")
+    i = 0
+    global count
+    path = args.raw_path + datasetName + "/mapping/"
+    Path(path).mkdir(parents=True, exist_ok=True)
+    mapping_file = open(path + "mapping_" + mode + ".txt", 'w', encoding='utf-8')
+    for index, row in df.iterrows():
+        if i > len(df):
+            print("Done")
+            break
+        else:
+            path = args.raw_path + datasetName + "/data/"
+            Path(path).mkdir(parents=True, exist_ok=True)
+            f = open(path + str(count) + ".txt", 'w', encoding='utf-8')
+            body = row['text']
+            newBody = str(body + '\n' + '\n' + '@highlight' + '\n' + '\n' + row['summary'])
+            f.write(newBody)
+            mapping_file.write(str(count) + '\n')
+            f.close()
+            i += 1
+    mapping_file.close()
+
+
+def type_split(df, type):
+    grouped = df.groupby(df.density_bin)
+    df = grouped.get_group(type)
+    df.index = range(len(df))
+    return df
+
+
+def format_danewsroom(args):
+    df = pd.read_json(args.zip_path, lines=True)
+    if (args.type == "ext"):
+        df = type_split(df, "extractive")
+        df = clean_danewsroom(args, df)
+        exttrain, extvalidate, exttest = train_validate_test_split(df, 0.9, 0.05, 242)
+        toTxtFile(exttrain, "train", "extractive", args)
+        toTxtFile(extvalidate, "valid", "extractive", args)
+        toTxtFile(exttest, "test", "extractive", args)
+        logger.info("Done processing extractive")
+        logger.info("Done")
+
+    elif (args.type == "abs"):
+        df = type_split(df, "abstractive")
+        df = clean_danewsroom(args, df)
+        abtrain, abvalidate, abtest = train_validate_test_split(df, 0.9, 0.05, 242)
+        toTxtFile(abtrain, "train", "abstractive", args)
+        toTxtFile(abvalidate, "valid", "abstractive", args)
+        toTxtFile(abtest, "test", "abstractive", args)
+        logger.info("Done processing abstractive")
+        logger.info("Done")
+
+    elif (args.type == "mix"):
+        df = type_split(df, "mixed")
+        df = clean_danewsroom(args, df)
+        mixtrain, mixvalidate, mixtest = train_validate_test_split(df, 0.9, 0.05, 242)
+        toTxtFile(mixtrain, "train", "mixed", args)
+        toTxtFile(mixvalidate, "valid", "mixed", args)
+        toTxtFile(mixtest, "test", "mixed", args)
+        logger.info("Done processing mixed")
+        logger.info("Done")
+
+    elif (args.type == 'all'):
+        df = clean_danewsroom(args, df)
+        ext = type_split(df, "extractive")
+        ab = type_split(df, "abstractive")
+        mix = type_split(df, "mixed")
+
+        exttrain, extvalidate, exttest = train_validate_test_split(ext, 0.9, 0.05, 242)
+        mixtrain, mixvalidate, mixtest = train_validate_test_split(mix, 0.9, 0.05, 242)
+        abtrain, abvalidate, abtest = train_validate_test_split(ab, 0.9, 0.05, 242)
+
+        toTxtFile(exttrain, "train", "extractive", args)
+        toTxtFile(extvalidate, "valid", "extractive", args)
+        toTxtFile(exttest, "test", "extractive", args)
+        logger.info("Done processing extractive")
+
+        global count
+        count = 0
+        toTxtFile(mixtrain, "train", "mixed", args)
+        toTxtFile(mixvalidate, "valid", "mixed", args)
+        toTxtFile(mixtest, "test", "mixed", args)
+        logger.info("Done processing mixed", args)
+
+        global count
+        count = 0
+        toTxtFile(abtrain, "train", "abstractive", args)
+        toTxtFile(abvalidate, "valid", "abstractive", args)
+        toTxtFile(abtest, "test", "abstractive", args)
+        logger.info("Done processing abstractive")
+        logger.info("Done")
+
+    elif (args.type == 'full'):
+        df = clean_danewsroom(args, df)
+        train, validate, test = train_validate_test_split(df, 0.90, 0.05, 242)
+        toTxtFile(train, "train", "full", args)
+        toTxtFile(validate, "valid", "full", args)
+        toTxtFile(test, "test", "full", args)
+        logger.info("Done processing full")
+        logger.info("Done")
+    elif (args.type == 'combined'):
+        df = clean_danewsroom(args, df)
+        df2 = format_tv2(args)
+        df3 = df2.append(df)
+        train, validate, test = train_validate_test_split(df3, 0.90, 0.05, 242)
+        toTxtFile(train, "train", "combined", args)
+        toTxtFile(validate, "valid", "combined", args)
+        toTxtFile(test, "test", "combined", args)
+        logger.info("Done processing combined")
+        logger.info("Done")
+
+
+def clean_danewsroom(args, df):
+    for index, row in df.iterrows():
+        src = row['text']
+        summary = row['summary']
+        summary = summary.replace('`', '\'')
+        summary = summary.replace('´', '\'')
+        if args.botxo == False:
+            summary = summary.replace('å', 'aa')
+            summary = summary.replace('Å', 'aa')
+            src = src.replace('å', 'aa')
+            src = src.replace('Å', 'aa')
+        src = src.replace('`', '\'')
+        src = src.replace('´', '\'')
+        df.at[index, 'summary'] = summary
+        df.at[index, 'text'] = src
+    return df
