@@ -120,8 +120,8 @@ class Bert(nn.Module):
             self.model = BertModel.from_pretrained('bert-base-multilingual-cased', cache_dir=temp_dir)
         else:
             self.model = BertModel.from_pretrained(bert_model, cache_dir=temp_dir)
-            self.model.resize_token_embeddings(31755)
-            self.model.embeddings(119547, 768, 0)
+            self.model.resize_token_embeddings(31756)
+            self.word_embeddings = nn.Embedding(31756, 768, padding_idx=0)
 
         self.finetune = finetune
 
