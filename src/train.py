@@ -124,13 +124,12 @@ if __name__ == '__main__':
     device = "cpu" if args.visible_gpus == '-1' else "cuda"
     device_id = 0 if device == "cuda" else -1
 
-    t = time.time()
-    newT = str(t).split(".")
-
     def run(args,hpspace):
         if (args.task == 'abs'):
             if (args.mode == 'train'):
                 if(hyper_opt()):
+                    t = time.time()
+                    newT = str(t).split(".")
                     args.model_path = "../models/" + newT[0]
                     args.log_file = "../logs/abs_bert_abs_" + newT[0]
                     args.lr_bert = hpspace['lr_bert']
