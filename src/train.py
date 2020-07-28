@@ -216,16 +216,7 @@ if __name__ == '__main__':
                     trials=trials)
 
         pickle.dump(trials, open("trials.p", "wb"))
-        myfile = open("results.txt", 'w')
 
-        # Write a line to the file
-        myfile.write(best)
-        myfile.write('\n')
-        myfile.write(trials)
-        # Close the file
-        myfile.close()
-        #logger.info(trials)
-        #logger.info(best)
 
     if(args.hyperopt):
         hyper_opt(args)
