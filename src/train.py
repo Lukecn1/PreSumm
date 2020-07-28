@@ -6,9 +6,13 @@ from __future__ import division
 
 import argparse
 import os
+import time
+import pickle
+
 from others.logging import init_logger
 from train_abstractive import validate_abs, train_abs, baseline, test_abs, test_text_abs
 from train_extractive import train_ext, validate_ext, test_ext
+from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
 model_flags = ['hidden_size', 'ff_size', 'heads', 'emb_size', 'enc_layers', 'enc_hidden_size', 'enc_ff_size',
                'dec_layers', 'dec_hidden_size', 'dec_ff_size', 'encoder', 'ff_actv', 'use_interval']
@@ -26,19 +30,22 @@ def str2bool(v):
 
 
 if __name__ == '__main__':
+
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("-task", default='ext', type=str, choices=['ext', 'abs'])
+    parser.add_argument("-task", default='abs', type=str, choices=['ext', 'abs'])
     parser.add_argument("-encoder", default='bert', type=str, choices=['bert', 'baseline'])
     parser.add_argument("-mode", default='train', type=str, choices=['train', 'validate', 'test', 'lead', 'oracle'])
-    parser.add_argument("-bert_data_path", default='../bert_data/cnndm')
+    parser.add_argument("-bert_data_path", default='../bert_data/bxo/abs/bxoabs')
     parser.add_argument("-model_path", default='../models/')
     parser.add_argument("-result_path", default='../results/cnndm')
     parser.add_argument("-temp_dir", default='../temp')
     parser.add_argument("-bert_model", default='bert-base-multilingual-cased')
     parser.add_argument("-vocab", type=str, default='bert-base-multilingual-cased')
+    parser.add_argument("-hyperopt", default=False)
 
 
-    parser.add_argument("-batch_size", default=140, type=int)
+    parser.add_argument("-batch_size", default=10, type=int)
     parser.add_argument("-test_batch_size", default=200, type=int)
 
     parser.add_argument("-max_pos", default=512, type=int)
@@ -46,10 +53,10 @@ if __name__ == '__main__':
     parser.add_argument("-large", type=str2bool, nargs='?',const=True,default=False)
     parser.add_argument("-load_from_extractive", default='', type=str)
 
-    parser.add_argument("-sep_optim", type=str2bool, nargs='?',const=True,default=False)
-    parser.add_argument("-lr_bert", default=2e-3, type=float)
-    parser.add_argument("-lr_dec", default=2e-3, type=float)
-    parser.add_argument("-use_bert_emb", type=str2bool, nargs='?',const=True,default=False)
+    parser.add_argument("-sep_optim", type=str2bool, nargs='?',const=True,default=True)
+    parser.add_argument("-lr_bert", default=0.002, type=float)
+    parser.add_argument("-lr_dec", default=0.2, type=float)
+    parser.add_argument("-use_bert_emb", type=str2bool, nargs='?',const=True,default=True)
 
     parser.add_argument("-share_emb", type=str2bool, nargs='?', const=True, default=False)
     parser.add_argument("-finetune_bert", type=str2bool, nargs='?', const=True, default=True)
@@ -78,8 +85,6 @@ if __name__ == '__main__':
     parser.add_argument("-max_length", default=150, type=int)
     parser.add_argument("-max_tgt_len", default=140, type=int)
 
-
-
     parser.add_argument("-param_init", default=0, type=float)
     parser.add_argument("-param_init_glorot", type=str2bool, nargs='?',const=True,default=True)
     parser.add_argument("-optim", default='adam', type=str)
@@ -87,18 +92,17 @@ if __name__ == '__main__':
     parser.add_argument("-beta1", default= 0.9, type=float)
     parser.add_argument("-beta2", default=0.999, type=float)
     parser.add_argument("-warmup_steps", default=8000, type=int)
-    parser.add_argument("-warmup_steps_bert", default=8000, type=int)
-    parser.add_argument("-warmup_steps_dec", default=8000, type=int)
+    parser.add_argument("-warmup_steps_bert", default=20000, type=int)
+    parser.add_argument("-warmup_steps_dec", default=10000, type=int)
     parser.add_argument("-max_grad_norm", default=0, type=float)
 
-    parser.add_argument("-save_checkpoint_steps", default=5, type=int)
+    parser.add_argument("-save_checkpoint_steps", default=500, type=int)
     parser.add_argument("-accum_count", default=1, type=int)
-    parser.add_argument("-report_every", default=1, type=int)
-    parser.add_argument("-train_steps", default=1000, type=int)
+    parser.add_argument("-report_every", default=50, type=int)
+    parser.add_argument("-train_steps", default=3000, type=int)
     parser.add_argument("-recall_eval", type=str2bool, nargs='?',const=True,default=False)
 
-
-    parser.add_argument('-visible_gpus', default='-1', type=str)
+    parser.add_argument('-visible_gpus', default='0', type=str)
     parser.add_argument('-gpu_ranks', default='0', type=str)
     parser.add_argument('-log_file', default='../logs/cnndm.log')
     parser.add_argument('-seed', default=666, type=int)
@@ -120,46 +124,110 @@ if __name__ == '__main__':
     device = "cpu" if args.visible_gpus == '-1' else "cuda"
     device_id = 0 if device == "cuda" else -1
 
-    if (args.task == 'abs'):
-        if (args.mode == 'train'):
-            train_abs(args, device_id)
-        elif (args.mode == 'validate'):
-            validate_abs(args, device_id)
-        elif (args.mode == 'lead'):
-            baseline(args, cal_lead=True)
-        elif (args.mode == 'oracle'):
-            baseline(args, cal_oracle=True)
-        if (args.mode == 'test'):
-            cp = args.test_from
-            try:
-                step = int(cp.split('.')[-2].split('_')[-1])
-            except:
-                step = 0
-            test_abs(args, device_id, cp, step)
-        elif (args.mode == 'test_text'):
-            cp = args.test_from
-            try:
-                step = int(cp.split('.')[-2].split('_')[-1])
-            except:
-                step = 0
-                test_text_abs(args, device_id, cp, step)
+    t = time.time()
+    newT = str(t).split(".")
 
-    elif (args.task == 'ext'):
-        if (args.mode == 'train'):
-            train_ext(args, device_id)
-        elif (args.mode == 'validate'):
-            validate_ext(args, device_id)
-        if (args.mode == 'test'):
-            cp = args.test_from
-            try:
-                step = int(cp.split('.')[-2].split('_')[-1])
-            except:
-                step = 0
-            test_ext(args, device_id, cp, step)
-        elif (args.mode == 'test_text'):
-            cp = args.test_from
-            try:
-                step = int(cp.split('.')[-2].split('_')[-1])
-            except:
-                step = 0
-                test_text_abs(args, device_id, cp, step)
+    def run(args,hpspace):
+        if (args.task == 'abs'):
+            if (args.mode == 'train'):
+                if(hyper_opt()):
+                    args.model_path = "../models/" + newT[0]
+                    args.log_file = "../logs/abs_bert_abs_" + newT[0]
+                    args.lr_bert = hpspace['lr_bert']
+                    args.lr_dec = hpspace['lr_dec']
+                    args.accum_count = int(hpspace['accum_count'])
+                    args.beam_size = int(hpspace['beam_size'])
+                    args.alpha = hpspace['alpha']
+                    args.beta1 = hpspace['beta1']
+                    args.beta2 = hpspace['beta2']
+                    args.lr = hpspace['lr']
+                    args.visible_gpus = '0'
+                    args.bert_model = '..temp/bert-base-danish-uncased-v2'
+                    args.vocab = '..temp/bert-base-danish-uncased-v2'
+                train_stats = train_abs(args, device_id)
+                x = train_stats.x
+                ppl = train_stats.perplexity
+                acc = train_stats.acc
+                print(x)
+                return {
+                    'loss': x,                    # -- store other results like this
+                    'eval_time': time.time(),
+                    'status': STATUS_OK,
+                    'other_stuff': {'ppl': ppl, 'acc': acc}
+                }
+            elif (args.mode == 'validate'):
+                validate_abs(args, device_id)
+            elif (args.mode == 'lead'):
+                baseline(args, cal_lead=True)
+            elif (args.mode == 'oracle'):
+                baseline(args, cal_oracle=True)
+            if (args.mode == 'test'):
+                cp = args.test_from
+                try:
+                    step = int(cp.split('.')[-2].split('_')[-1])
+                except:
+                    step = 0
+                test_abs(args, device_id, cp, step)
+            elif (args.mode == 'test_text'):
+                cp = args.test_from
+                try:
+                    step = int(cp.split('.')[-2].split('_')[-1])
+                except:
+                    step = 0
+                    test_text_abs(args, device_id, cp, step)
+
+        elif (args.task == 'ext'):
+            if (args.mode == 'train'):
+                train_ext(args, device_id)
+            elif (args.mode == 'validate'):
+                validate_ext(args, device_id)
+            if (args.mode == 'test'):
+                cp = args.test_from
+                try:
+                    step = int(cp.split('.')[-2].split('_')[-1])
+                except:
+                    step = 0
+                test_ext(args, device_id, cp, step)
+            elif (args.mode == 'test_text'):
+                cp = args.test_from
+                try:
+                    step = int(cp.split('.')[-2].split('_')[-1])
+                except:
+                    step = 0
+                    test_text_abs(args, device_id, cp, step)
+
+    def hyper_opt(args):
+        hpspace = {
+            'lr': hp.loguniform('lr', -0.01, 0.10),
+            'lr_bert': hp.loguniform('lr_bert', -6.3, 0.4),
+            'lr_dec': hp.loguniform('lr_dec', -1.7, 0.4),
+            'accum_count': hp.uniform('accum_count', 20, 100),
+            'beam_size': hp.uniform('beam_size', 4, 10),
+            'alpha': hp.lognormal('alpha', -0.5, 0.25),
+            'beta1': hp.uniform('beta1', 0.7, 0.99),
+            'beta2': hp.uniform('beta2', 0.7, 0.999)
+        }
+
+        trials = Trials()
+        best = fmin(run(args),
+                    space=hpspace,
+                    algo=tpe.suggest,
+                    max_evals=2,
+                    trials=trials)
+
+        pickle.dump(trials, open("trials.p", "wb"))
+        myfile = open("results.txt", 'w')
+
+        # Write a line to the file
+        myfile.write(best)
+        myfile.write('\n')
+        myfile.write(trials)
+        # Close the file
+        myfile.close()
+        #logger.info(trials)
+        #logger.info(best)
+
+    if(args.hyperopt):
+        hyper_opt(args)
+    else:
+        run(args, {})

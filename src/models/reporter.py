@@ -172,6 +172,9 @@ class Statistics(object):
         self.n_correct = n_correct
         self.n_src_words = 0
         self.start_time = time.time()
+        self.acc = 0
+        self.x = 0
+        self.perplexity = 0
 
     @staticmethod
     def all_gather_stats(stat, max_size=4096):
@@ -230,6 +233,9 @@ class Statistics(object):
         self.n_words += stat.n_words
         self.n_correct += stat.n_correct
         self.n_docs += stat.n_docs
+        self.acc = self.accuracy()
+        self.perplexity = self.ppl()
+        self.x = self.xent()
 
         if update_n_src_words:
             self.n_src_words += stat.n_src_words

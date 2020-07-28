@@ -15,7 +15,6 @@ import torch
 from pytorch_transformers import BertTokenizer
 
 import distributed
-from pathlib import Path
 from models import data_loader, model_builder
 from models.data_loader import load_dataset
 from models.loss import abs_loss
@@ -50,18 +49,23 @@ def train_abs_multi(args):
 
     # Train with multiprocessing.
     procs = []
+    return_dict = dict()
     for i in range(nb_gpu):
         device_id = i
         procs.append(mp.Process(target=run, args=(args,
-                                                  device_id, error_queue,), daemon=True))
+                                                  device_id, error_queue, return_dict), daemon=True))
         procs[i].start()
         logger.info(" Starting process pid: %d  " % procs[i].pid)
         error_handler.add_child(procs[i].pid)
+
     for p in procs:
         p.join()
 
+    values = return_dict.values()
+    return sum(values)/2
 
-def run(args, device_id, error_queue):
+
+def run(args, device_id, error_queue, return_dict):
     """ run process """
 
     setattr(args, 'gpu_ranks', [int(i) for i in args.gpu_ranks])
@@ -73,7 +77,9 @@ def run(args, device_id, error_queue):
             raise AssertionError("An error occurred in \
                   Distributed initialization")
 
-        train_abs_single(args, device_id)
+        train_stats = train_abs_single(args, device_id)
+        return_dict[device_id] = train_stats.x
+        return train_stats
     except KeyboardInterrupt:
         pass  # killed by parent, do nothing
     except Exception:
@@ -299,7 +305,7 @@ def baseline(args, cal_lead=False, cal_oracle=False):
                                        args.batch_size, 'cpu',
                                        shuffle=False, is_test=True)
 
-    trainer = build_trainer(args, -1, None, None, None)
+    trainer = build_trainer(args, '-1', None, None, None)
     #
     if (cal_lead):
         trainer.test(test_iter, 0, cal_lead=True)
@@ -309,9 +315,11 @@ def baseline(args, cal_lead=False, cal_oracle=False):
 
 def train_abs(args, device_id):
     if (args.world_size > 1):
-        train_abs_multi(args)
+        x = train_abs_multi(args)
+        return x
     else:
-        train_abs_single(args, device_id)
+        train_stats = train_abs_single(args, device_id)
+        return train_stats
 
 
 def train_abs_single(args, device_id):
@@ -385,4 +393,5 @@ def train_abs_single(args, device_id):
 
     trainer = build_trainer(args, device_id, model, optim, train_loss)
 
-    trainer.train(train_iter_fct, args.train_steps)
+    train_stats = trainer.train(train_iter_fct, args.train_steps)
+    return train_stats
