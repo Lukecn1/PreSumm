@@ -507,7 +507,7 @@ def load_data_tv2(args, path):
     df['summary'] = text_cleaner(args, df['summary'].values[0])
     return df
 
-
+#Splits the dataframe into train, validate and test sets
 def train_validate_test_split(df, train_percent=.90, validate_percent=.05, seed=None):
     np.random.seed(seed)
     perm = np.random.permutation(df.index)
@@ -519,7 +519,7 @@ def train_validate_test_split(df, train_percent=.90, validate_percent=.05, seed=
     test = df.iloc[perm[validate_end:]]
     return train, validate, test
 
-
+#Writes each document to a txt file including a "mapping" file that holds information on what train/valid/test set the document belongs
 def toTxtFile(df, mode, datasetName, args):
     print("TO TXT")
     i = 0
@@ -543,14 +543,15 @@ def toTxtFile(df, mode, datasetName, args):
             i += 1
     mapping_file.close()
 
-
+#Finds all documents of the specific type  either "extractive", "mixed" or "abstrative"
+# in the dataframes and returns a dataframe only containing that type.
 def type_split(df, type):
     grouped = df.groupby(df.density_bin)
     df = grouped.get_group(type)
     df.index = range(len(df))
     return df
 
-
+#Formats danewsroom depended on the type you want. Current types = ext,abs,mix,full and combined
 def format_danewsroom(args):
     df = pd.read_json(args.zip_path, lines=True)
     if (args.type == "ext"):
@@ -632,7 +633,7 @@ def format_danewsroom(args):
         logger.info("Done processing combined")
         logger.info("Done")
 
-
+#Cleans the text in a dataframe from unwanted tokens.
 def clean_danewsroom(args, df):
     for index, row in df.iterrows():
         src = row['text']
