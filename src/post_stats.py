@@ -62,8 +62,8 @@ def cal_repeat(args):
     src_lines = open(args.result_path+'.raw_src').read().strip().split('\n')
     lines = zip(candidate_lines,gold_lines,src_lines)
 
-    summary_ngram_novel = {1: [0, 0, 0], 2: [0, 0, 0], 4: [0, 0, 0]}
-    gold_ngram_novel = {1: [0, 0, 0], 2: [0, 0, 0], 4: [0, 0, 0]}
+    summary_ngram_novel = {1: [0, 0, 0], 2: [0, 0, 0], 3: [0, 0, 0]}
+    gold_ngram_novel = {1: [0, 0, 0], 2: [0, 0, 0], 3: [0, 0, 0]}
 
     for c,g,s in lines:
         # self_repeats = cal_self_repeat(c)

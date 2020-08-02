@@ -11,7 +11,7 @@ import pickle
 
 from others.logging import init_logger
 from train_abstractive import validate_abs, train_abs, baseline, test_abs, test_text_abs
-from train_extractive import train_ext, validate_ext, test_ext
+from train_extractive import train_ext, validate_ext, test_ext, sent_label_ext
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
 model_flags = ['hidden_size', 'ff_size', 'heads', 'emb_size', 'enc_layers', 'enc_hidden_size', 'enc_ff_size',
@@ -35,14 +35,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-task", default='abs', type=str, choices=['ext', 'abs'])
     parser.add_argument("-encoder", default='bert', type=str, choices=['bert', 'baseline'])
-    parser.add_argument("-mode", default='train', type=str, choices=['train', 'validate', 'test', 'lead', 'oracle'])
+    parser.add_argument("-mode", default='train', type=str, choices=['train', 'validate', 'test', 'lead', 'oracle','sent_label'])
     parser.add_argument("-bert_data_path", default='../bert_data/bxo/abs/bxoabs')
     parser.add_argument("-model_path", default='../models/')
     parser.add_argument("-result_path", default='../results/cnndm')
     parser.add_argument("-temp_dir", default='../temp')
     parser.add_argument("-bert_model", default='bert-base-multilingual-cased')
     parser.add_argument("-vocab", type=str, default='bert-base-multilingual-cased')
-    parser.add_argument("-hyperopt", default=False)
+    parser.add_argument("-hyperopt", type=bool, default=False)
 
 
     parser.add_argument("-batch_size", default=10, type=int)
@@ -124,23 +124,20 @@ if __name__ == '__main__':
     device = "cpu" if args.visible_gpus == '-1' else "cuda"
     device_id = 0 if device == "cuda" else -1
 
-    t = time.time()
-    newT = str(t).split(".")
 
     def run(args,hpspace):
         if (args.task == 'abs'):
             if (args.mode == 'train'):
-                if(hyper_opt()):
+                if(args.hyperopt):
+                    t = time.time()
+                    newT = str(t).split(".")
                     args.model_path = "../models/" + newT[0]
                     args.log_file = "../logs/abs_bert_abs_" + newT[0]
                     args.lr_bert = hpspace['lr_bert']
                     args.lr_dec = hpspace['lr_dec']
                     args.accum_count = int(hpspace['accum_count'])
-                    args.beam_size = int(hpspace['beam_size'])
-                    args.alpha = hpspace['alpha']
                     args.beta1 = hpspace['beta1']
                     args.beta2 = hpspace['beta2']
-                    args.lr = hpspace['lr']
                     args.visible_gpus = '0'
                     args.bert_model = '..temp/bert-base-danish-uncased-v2'
                     args.vocab = '..temp/bert-base-danish-uncased-v2'
@@ -150,7 +147,7 @@ if __name__ == '__main__':
                 acc = train_stats.acc
                 print(x)
                 return {
-                    'loss': x,                    # -- store other results like this
+                    'loss': x,
                     'eval_time': time.time(),
                     'status': STATUS_OK,
                     'other_stuff': {'ppl': ppl, 'acc': acc}
@@ -175,7 +172,6 @@ if __name__ == '__main__':
                 except:
                     step = 0
                     test_text_abs(args, device_id, cp, step)
-
         elif (args.task == 'ext'):
             if (args.mode == 'train'):
                 train_ext(args, device_id)
@@ -195,15 +191,15 @@ if __name__ == '__main__':
                 except:
                     step = 0
                     test_text_abs(args, device_id, cp, step)
-
+        if (args.mode == "sent_label"):
+            step = 0
+            sent_label_ext(args, device_id)
     def hyper_opt(args):
         hpspace = {
             'lr': hp.loguniform('lr', -0.01, 0.10),
             'lr_bert': hp.loguniform('lr_bert', -6.3, 0.4),
             'lr_dec': hp.loguniform('lr_dec', -1.7, 0.4),
             'accum_count': hp.uniform('accum_count', 20, 100),
-            'beam_size': hp.uniform('beam_size', 4, 10),
-            'alpha': hp.lognormal('alpha', -0.5, 0.25),
             'beta1': hp.uniform('beta1', 0.7, 0.99),
             'beta2': hp.uniform('beta2', 0.7, 0.999)
         }
@@ -216,16 +212,7 @@ if __name__ == '__main__':
                     trials=trials)
 
         pickle.dump(trials, open("trials.p", "wb"))
-        myfile = open("results.txt", 'w')
-
-        # Write a line to the file
-        myfile.write(best)
-        myfile.write('\n')
-        myfile.write(trials)
-        # Close the file
-        myfile.close()
-        #logger.info(trials)
-        #logger.info(best)
+        print(best)
 
     if(args.hyperopt):
         hyper_opt(args)

@@ -212,13 +212,11 @@ class BertData():
             self.tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False)
         else:
             self.tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True)
-            print(len(self.tokenizer.vocab))
             if (len(self.tokenizer.vocab) == 31748):
                 f = open(args.bert_model + "/vocab.txt", "a")
                 f.write("\n[unused1]\n[unused2]\n[unused3]\n[unused4]\n[unused5]\n[unused6]\n[unused7]")
                 f.close()
                 self.tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True)
-            print(len(self.tokenizer.vocab))
         self.sep_token = '[SEP]'
         self.cls_token = '[CLS]'
         self.pad_token = '[PAD]'
@@ -229,8 +227,10 @@ class BertData():
         self.cls_vid = self.tokenizer.vocab[self.cls_token]
         self.pad_vid = self.tokenizer.vocab[self.pad_token]
 
-    def preprocess(self, src, tgt, sent_labels, use_bert_basic_tokenizer, is_test=False):
+    def preprocess(self, src, tgt, sent_labels, shuffle_sent, use_bert_basic_tokenizer, is_test=False):
 
+        if(shuffle_sent == True):
+            random.Random(4).shuffle(src)
         if ((not is_test) and len(src) == 0):
             return None
 
@@ -320,7 +320,7 @@ def _format_to_bert(params):
         if (args.lower):
             source = [' '.join(s).lower().split() for s in source]
             tgt = [' '.join(s).lower().split() for s in tgt]
-        b_data = bert.preprocess(source, tgt, sent_labels, use_bert_basic_tokenizer=args.use_bert_basic_tokenizer,
+        b_data = bert.preprocess(source, tgt, sent_labels, args.shuffle_sent, use_bert_basic_tokenizer=args.use_bert_basic_tokenizer,
                                  is_test=is_test)
         # b_data = bert.preprocess(source, tgt, sent_labels, use_bert_basic_tokenizer=args.use_bert_basic_tokenizer)
 
@@ -509,6 +509,7 @@ def load_data_tv2(args, path):
 
 #Splits the dataframe into train, validate and test sets
 def train_validate_test_split(df, train_percent=.90, validate_percent=.05, seed=None):
+    logger.info("Splits dataset")
     np.random.seed(seed)
     perm = np.random.permutation(df.index)
     m = len(df.index)
@@ -521,10 +522,10 @@ def train_validate_test_split(df, train_percent=.90, validate_percent=.05, seed=
 
 #Writes each document to a txt file including a "mapping" file that holds information on what train/valid/test set the document belongs
 def toTxtFile(df, mode, datasetName, args):
-    print("TO TXT")
+    logger.info("Writes TXT Files")
     i = 0
     global count
-    path = args.raw_path + datasetName + "/mapping/"
+    path = args.save_path + datasetName + "/mapping/"
     Path(path).mkdir(parents=True, exist_ok=True)
     mapping_file = open(path + "mapping_" + mode + ".txt", 'w', encoding='utf-8')
     for index, row in df.iterrows():
@@ -532,7 +533,7 @@ def toTxtFile(df, mode, datasetName, args):
             print("Done")
             break
         else:
-            path = args.raw_path + datasetName + "/data/"
+            path = args.save_path + datasetName + "/data/"
             Path(path).mkdir(parents=True, exist_ok=True)
             f = open(path + str(count) + ".txt", 'w', encoding='utf-8')
             body = row['text']
@@ -541,6 +542,7 @@ def toTxtFile(df, mode, datasetName, args):
             mapping_file.write(str(count) + '\n')
             f.close()
             i += 1
+            count += 1
     mapping_file.close()
 
 #Finds all documents of the specific type  either "extractive", "mixed" or "abstrative"
@@ -553,7 +555,9 @@ def type_split(df, type):
 
 #Formats danewsroom depended on the type you want. Current types = ext,abs,mix,full and combined
 def format_danewsroom(args):
+    logger.info("Loading DaNewsroom")
     df = pd.read_json(args.zip_path, lines=True)
+    global count
     if (args.type == "ext"):
         df = type_split(df, "extractive")
         df = clean_danewsroom(args, df)
@@ -599,14 +603,12 @@ def format_danewsroom(args):
         toTxtFile(exttest, "test", "extractive", args)
         logger.info("Done processing extractive")
 
-        global count
         count = 0
         toTxtFile(mixtrain, "train", "mixed", args)
         toTxtFile(mixvalidate, "valid", "mixed", args)
         toTxtFile(mixtest, "test", "mixed", args)
         logger.info("Done processing mixed", args)
 
-        global count
         count = 0
         toTxtFile(abtrain, "train", "abstractive", args)
         toTxtFile(abvalidate, "valid", "abstractive", args)
@@ -623,10 +625,10 @@ def format_danewsroom(args):
         logger.info("Done processing full")
         logger.info("Done")
     elif (args.type == 'combined'):
-        df = clean_danewsroom(args, df)
-        df2 = format_tv2(args)
-        df3 = df2.append(df)
-        train, validate, test = train_validate_test_split(df3, 0.90, 0.05, 242)
+        df_full = clean_danewsroom(args, df)
+        df_tv2 = format_tv2(args)
+        df_combined = df_tv2.append(df_full)
+        train, validate, test = train_validate_test_split(df_combined, 0.90, 0.05, 242)
         toTxtFile(train, "train", "combined", args)
         toTxtFile(validate, "valid", "combined", args)
         toTxtFile(test, "test", "combined", args)

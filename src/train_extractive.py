@@ -196,6 +196,28 @@ def test_ext(args, device_id, pt, step):
     trainer = build_trainer(args, device_id, model, None)
     trainer.test(test_iter, step)
 
+def sent_label_ext(args, device_id):
+    device = "cpu" if args.visible_gpus == '-1' else "cuda"
+    test_iter = data_loader.Dataloader(args, load_dataset(args, 'test', shuffle=False),
+                                       args.test_batch_size, device,
+                                       shuffle=False, is_test=True)
+    dict = {0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:0,
+            10:0, 11:0, 12:0, 13:0, 14:0, 15:0, 16:0, 17:0, 18:0, 19:0}
+    total = 0
+    for batch in test_iter:
+        labels = batch.src_sent_labels
+        for i in labels:
+            b = i.numpy()
+            for j in range(len(b)):
+                if(j > 19):
+                    break
+                if (b[j] == 1):
+                    val = dict.get(j)
+                    dict[j] = val+1
+                    total +=1
+    print(dict)
+    print(total)
+
 def train_ext(args, device_id):
     if (args.world_size > 1):
         train_multi_ext(args)

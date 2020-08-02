@@ -292,7 +292,7 @@ class Trainer(object):
                             for i in range(len(batch.src_str)):
                                 s = batch.src_str[i]
                                 for j in range(len(s)):
-                                    save_src.write(s[j] + " ")
+                                    save_src.write(s[j] + " . ")
                                 save_src.write('\n')
         if (step != -1 and self.args.report_rouge):
             rouges = test_rouge(self.args.temp_dir, can_path, gold_path)
