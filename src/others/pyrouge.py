@@ -251,11 +251,16 @@ class Rouge155(object):
 
         """
         # sentences = text.split("\n")
+        from nltk.stem.snowball import DanishStemmer
+        stemmer = DanishStemmer()
         sentences = text.split("<q>")
+        output = []
+        for sentence in sentences:
+            output.append(" ".join([stemmer.stem(i) for i in sentence.split()]))
         sent_elems = [
             "<a name=\"{i}\">[{i}]</a> <a href=\"#{i}\" id={i}>"
             "{text}</a>".format(i=i, text=sent)
-            for i, sent in enumerate(sentences, start=1)]
+            for i, sent in enumerate(output, start=1)]
         html = """<html>
 <head>
 <title>{title}</title>
