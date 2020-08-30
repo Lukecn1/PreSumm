@@ -15,7 +15,7 @@ Put all `.pt` files into `bert_data`
 ### Option 2: process the data yourself
 
 #### Step 1 Download txt files
-Download and unzip the `.json` directories from [here](http://cs.nyu.edu/~kcho/DMQA/) for the Tv2 articles. Put all  `.json` files in one directory (e.g. `../raw_stories`)
+Download and unzip the `.json` directories from [here](https://drive.google.com/file/d/19gYUTm5s0ULrYF973srs2tp5FSSMEgMF/view?usp=sharing) for the Tv2 articles. Put all  `.json` files in one directory (e.g. `../raw_stories`)
 
 ####  Step 2. Download Stanford CoreNLP
 We will need Stanford CoreNLP to tokenize the data. Download it [here](https://stanfordnlp.github.io/CoreNLP/) and unzip it. Then add the following command to your bash_profile:
