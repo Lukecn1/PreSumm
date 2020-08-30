@@ -48,6 +48,7 @@ python preprocess.py -mode format_to_lines -raw_path RAW_PATH -save_path JSON_PA
 * `RAW_PATH` is the directory containing tokenized files (`../merged_stories_tokenized`), `JSON_PATH` is the target directory to save the generated json files (`../json_data/cnndm`), `MAP_PATH` is the directory for the mapping folder that contains ids of articles and which train/valid/test split they belong.
 
 ####  Step 6. Format to PyTorch Files
+When preprocessing for DaBERT Use `-bert_model PATH_TO_DaBERT_FOLDER`
 ```
 python preprocess.py -mode format_to_bert -raw_path JSON_PATH -save_path BERT_DATA_PATH  -lower -n_cpus 1 -log_file ../logs/preprocess.log
 ```
