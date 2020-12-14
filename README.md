@@ -1,6 +1,6 @@
 # PreSumm
 
-**This code is forked and refactored from the EMNLP 2019 paper [Text Summarization with Pretrained Encoders](https://arxiv.org/abs/1908.08345)**
+**This code is adapted and refactored from the EMNLP 2019 paper [Text Summarization with Pretrained Encoders](https://arxiv.org/abs/1908.08345)**
 
 
 Some codes are borrowed from ONMT(https://github.com/OpenNMT/OpenNMT-py
